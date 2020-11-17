@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.0)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Config options
-option(BUILD_EXAMPLES "Build the examples." ON)
-option(BUILD_GAMES "Build the example games." ON)
+option(BUILD_EXAMPLES "Build the examples." OFF)
+option(BUILD_GAMES "Build the example games." OFF)
 option(ENABLE_ASAN  "Enable AddressSanitizer (ASAN) for debugging (degrades performance)" OFF)
 option(ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer (UBSan) for debugging" OFF)
 option(ENABLE_MSAN "Enable MemorySanitizer (MSan) for debugging (not recommended to run with ASAN)" OFF)
