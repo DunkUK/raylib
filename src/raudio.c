@@ -128,6 +128,7 @@
 // Type required before windows.h inclusion
 typedef struct tagMSG *LPMSG;
 
+#define NOSOUND
 #include <windows.h>
 
 // Type required by some unused function...
@@ -817,7 +818,7 @@ void ExportWaveAsCode(Wave wave, const char *fileName)
 }
 
 // Play a sound
-void PlaySound(Sound sound)
+inline void PlaySound(Sound sound)
 {
     PlayAudioBuffer(sound.stream.buffer);
 }
