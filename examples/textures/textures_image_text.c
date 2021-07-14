@@ -19,14 +19,14 @@ int main(void)
     const int screenHeight = 450;
 
     InitWindow(screenWidth, screenHeight, "raylib [texture] example - image text drawing");
-    
+
     Image parrots = LoadImage("resources/parrots.png"); // Load image in CPU memory (RAM)
 
     // TTF Font loading with custom generation parameters
     Font font = LoadFontEx("resources/KAISG.ttf", 64, 0, 0);
 
     // Draw over image using custom font
-    ImageDrawTextEx(&parrots, (Vector2){ 20.0f, 20.0f }, font, "[Parrots font drawing]", (float)font.baseSize, 0.0f, RED);
+    ImageDrawTextEx(&parrots, font, "[Parrots font drawing]", (Vector2){ 20.0f, 20.0f }, (float)font.baseSize, 0.0f, RED);
 
     Texture2D texture = LoadTextureFromImage(parrots);  // Image converted to texture, uploaded to GPU memory (VRAM)
     UnloadImage(parrots);   // Once image has been converted to texture and uploaded to VRAM, it can be unloaded from RAM

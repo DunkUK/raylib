@@ -31,13 +31,13 @@ int main(void)
     camera.target = (Vector3){ 0.0f, 8.0f, 0.0f };      // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.6f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                // Camera field-of-view Y
-    camera.type = CAMERA_PERSPECTIVE;                   // Camera mode type
+    camera.projection = CAMERA_PERSPECTIVE;                   // Camera mode type
 
     Ray ray = { 0 };        // Picking ray
 
     Model tower = LoadModel("resources/models/turret.obj");                 // Load OBJ model
     Texture2D texture = LoadTexture("resources/models/turret_diffuse.png"); // Load model texture
-    tower.materials[0].maps[MAP_DIFFUSE].texture = texture;                 // Set model diffuse texture
+    tower.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;                 // Set model diffuse texture
 
     Vector3 towerPos = { 0.0f, 0.0f, 0.0f };                    // Set model position
     BoundingBox towerBBox = MeshBoundingBox(tower.meshes[0]);   // Get mesh bounding box
@@ -142,8 +142,8 @@ int main(void)
                 // If we hit something, draw the cursor at the hit point
                 if (nearestHit.hit)
                 {
-                    DrawCube(nearestHit.position, 0.3, 0.3, 0.3, cursorColor);
-                    DrawCubeWires(nearestHit.position, 0.3, 0.3, 0.3, RED);
+                    DrawCube(nearestHit.position, 0.3f, 0.3f, 0.3f, cursorColor);
+                    DrawCubeWires(nearestHit.position, 0.3f, 0.3f, 0.3f, RED);
 
                     Vector3 normalEnd;
                     normalEnd.x = nearestHit.position.x + nearestHit.normal.x;
@@ -160,25 +160,25 @@ int main(void)
             EndMode3D();
 
             // Draw some debug GUI text
-            DrawText(FormatText("Hit Object: %s", hitObjectName), 10, 50, 10, BLACK);
+            DrawText(TextFormat("Hit Object: %s", hitObjectName), 10, 50, 10, BLACK);
 
             if (nearestHit.hit)
             {
                 int ypos = 70;
 
-                DrawText(FormatText("Distance: %3.2f", nearestHit.distance), 10, ypos, 10, BLACK);
+                DrawText(TextFormat("Distance: %3.2f", nearestHit.distance), 10, ypos, 10, BLACK);
 
-                DrawText(FormatText("Hit Pos: %3.2f %3.2f %3.2f",
+                DrawText(TextFormat("Hit Pos: %3.2f %3.2f %3.2f",
                                     nearestHit.position.x,
                                     nearestHit.position.y,
                                     nearestHit.position.z), 10, ypos + 15, 10, BLACK);
 
-                DrawText(FormatText("Hit Norm: %3.2f %3.2f %3.2f",
+                DrawText(TextFormat("Hit Norm: %3.2f %3.2f %3.2f",
                                     nearestHit.normal.x,
                                     nearestHit.normal.y,
                                     nearestHit.normal.z), 10, ypos + 30, 10, BLACK);
 
-                if (hitTriangle) DrawText(FormatText("Barycenter: %3.2f %3.2f %3.2f",  bary.x, bary.y, bary.z), 10, ypos + 45, 10, BLACK);
+                if (hitTriangle) DrawText(TextFormat("Barycenter: %3.2f %3.2f %3.2f",  bary.x, bary.y, bary.z), 10, ypos + 45, 10, BLACK);
             }
 
             DrawText("Use Mouse to Move Camera", 10, 430, 10, GRAY);

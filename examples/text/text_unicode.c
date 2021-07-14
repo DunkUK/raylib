@@ -159,8 +159,8 @@ int main(int argc, char **argv)
     // NOTE: fontAsian is for asian languages,
     // fontEmoji is the emojis and fontDefault is used for everything else
     Font fontDefault = LoadFont("resources/dejavu.fnt");
-    Font fontAsian = LoadFont("resources/notoCJK.fnt");
-    Font fontEmoji = LoadFont("resources/emoji.fnt");
+    Font fontAsian = LoadFont("resources/noto_cjk.fnt");
+    Font fontEmoji = LoadFont("resources/symbola.fnt");
 
     Vector2 hoveredPos = { 0.0f, 0.0f };
     Vector2 selectedPos = { 0.0f, 0.0f };
@@ -203,15 +203,15 @@ int main(int argc, char **argv)
             for (int i = 0; i < SIZEOF(emoji); ++i)
             {
                 const char *txt = &emojiCodepoints[emoji[i].index];
-                Rectangle emojiRect = { pos.x, pos.y, fontEmoji.baseSize, fontEmoji.baseSize };
+                Rectangle emojiRect = { pos.x, pos.y, (float)fontEmoji.baseSize, (float)fontEmoji.baseSize };
 
                 if (!CheckCollisionPointRec(mouse, emojiRect))
                 {
-                    DrawTextEx(fontEmoji, txt, pos, fontEmoji.baseSize, 1.0, selected == i ? emoji[i].color : Fade(LIGHTGRAY, 0.4f));
+                    DrawTextEx(fontEmoji, txt, pos, (float)fontEmoji.baseSize, 1.0f, selected == i ? emoji[i].color : Fade(LIGHTGRAY, 0.4f));
                 }
                 else
                 {
-                    DrawTextEx(fontEmoji, txt, pos, fontEmoji.baseSize, 1.0, emoji[i].color );
+                    DrawTextEx(fontEmoji, txt, pos, (float)fontEmoji.baseSize, 1.0f, emoji[i].color );
                     hovered = i;
                     hoveredPos = pos;
                 }
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
                     TextIsEqual(messages[message].language, "Japanese")) font = &fontAsian;
 
                 // Calculate size for the message box (approximate the height and width)
-                Vector2 sz = MeasureTextEx(*font, messages[message].text, font->baseSize, 1.0f);
+                Vector2 sz = MeasureTextEx(*font, messages[message].text, (float)font->baseSize, 1.0f);
                 if (sz.x > 300) { sz.y *= sz.x/300; sz.x = 300; }
                 else if (sz.x < 160) sz.x = 160;
 
@@ -267,15 +267,15 @@ int main(int argc, char **argv)
 
                 // Draw the main text message
                 Rectangle textRect = { msgRect.x + horizontalPadding/2, msgRect.y + verticalPadding/2, msgRect.width - horizontalPadding, msgRect.height };
-                DrawTextRec(*font, messages[message].text, textRect, font->baseSize, 1.0f, true, WHITE);
+                DrawTextRec(*font, messages[message].text, textRect, (float)font->baseSize, 1.0f, true, WHITE);
 
                 // Draw the info text below the main message
-                int size = strlen(messages[message].text);
+                int size = (int)strlen(messages[message].text);
                 int len = GetCodepointsCount(messages[message].text);
                 const char *info = TextFormat("%s %u characters %i bytes", messages[message].language, len, size);
                 sz = MeasureTextEx(GetFontDefault(), info, 10, 1.0f);
                 Vector2 pos = { textRect.x + textRect.width - sz.x,  msgRect.y + msgRect.height - sz.y - 2 };
-                DrawText(info, pos.x, pos.y, 10, RAYWHITE);
+                DrawText(info, (int)pos.x, (int)pos.y, 10, RAYWHITE);
             }
             //------------------------------------------------------------------------------
 
@@ -311,8 +311,7 @@ static void RandomizeEmoji(void)
         emoji[i].index = GetRandomValue(0, 179)*5;
 
         // Generate a random color for this emoji
-        Vector3 hsv = {(start*(i + 1))%360, 0.6f, 0.85f};
-        emoji[i].color = Fade(ColorFromHSV(hsv), 0.8f);
+        emoji[i].color = Fade(ColorFromHSV((float)((start*(i + 1))%360), 0.6f, 0.85f), 0.8f);
 
         // Set a random message for this emoji
         emoji[i].message = GetRandomValue(0, SIZEOF(messages) - 1);

@@ -4,7 +4,7 @@
 *
 *   Logo Screen Functions Definitions (Init, Update, Draw, Unload)
 *
-*   Copyright (c) 2014-2020 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2014-2021 Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -63,11 +63,6 @@ void InitLogoScreen(void)
     
     logoPositionX = GetScreenWidth()/2 - 128;
     logoPositionY = GetScreenHeight()/2 - 128;
-    
-    topSideRecWidth = LOGO_RECS_SIDE;
-    leftSideRecHeight = LOGO_RECS_SIDE;
-    bottomSideRecWidth = LOGO_RECS_SIDE;
-    rightSideRecHeight = LOGO_RECS_SIDE;
     
     for (int i = 0; i < 8; i++) raylib[i] = '\0';
     
