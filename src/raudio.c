@@ -312,6 +312,7 @@ struct rAudioBuffer {
 
     float volume;                   // Audio buffer volume
     float pitch;                    // Audio buffer pitch
+    float pan;                      // Audio buffer pan: 0 left, 0.5 centre, 1 right (CarouselEngine addition, like raylib 4's SetSoundPan)
 
     bool playing;                   // Audio buffer state: AUDIO_PLAYING
     bool paused;                    // Audio buffer state: AUDIO_PAUSED
@@ -368,7 +369,7 @@ static AudioData AUDIO = {          // Global AUDIO context
 //----------------------------------------------------------------------------------
 static void OnLog(ma_context *pContext, ma_device *pDevice, ma_uint32 logLevel, const char *message);
 static void OnSendAudioDataToDevice(ma_device *pDevice, void *pFramesOut, const void *pFramesInput, ma_uint32 frameCount);
-static void MixAudioFrames(float *framesOut, const float *framesIn, ma_uint32 frameCount, float localVolume);
+static void MixAudioFrames(float *framesOut, const float *framesIn, ma_uint32 frameCount, float localVolume, float pan);
 
 #if defined(SUPPORT_FILEFORMAT_WAV)
 static Wave LoadWAV(const unsigned char *fileData, unsigned int fileSize);   // Load WAV file
@@ -563,6 +564,7 @@ AudioBuffer *LoadAudioBuffer(ma_format format, ma_uint32 channels, ma_uint32 sam
     // Init audio buffer values
     audioBuffer->volume = 1.0f;
     audioBuffer->pitch = 1.0f;
+    audioBuffer->pan = 0.5f;
     audioBuffer->playing = false;
     audioBuffer->paused = false;
     audioBuffer->looping = false;
@@ -818,6 +820,28 @@ void UnloadWave(Wave wave)
 // Unload sound
 void UnloadSound(Sound sound)
 {
+    // DUNK: Copies played with PlaySoundMulti() share this sound's data, so stop any that are still playing it before it's freed (otherwise
+    // the mixer carries on reading freed memory, e.g. when a game's sounds are unloaded while one of them is still playing)
+    if (sound.stream.buffer != NULL)
+    {
+        ma_mutex_lock(&AUDIO.System.lock);
+        for (int i = 0; i < MAX_AUDIO_BUFFER_POOL_CHANNELS; i++)
+        {
+            AudioBuffer *copy = AUDIO.MultiChannel.pool[i];
+            if ((copy != NULL) && (copy->data == sound.stream.buffer->data))
+            {
+                copy->playing = false;
+                copy->paused = false;
+                copy->frameCursorPos = 0;
+                copy->totalFramesProcessed = 0;
+                copy->isSubBufferProcessed[0] = true;
+                copy->isSubBufferProcessed[1] = true;
+                copy->data = NULL;
+            }
+        }
+        ma_mutex_unlock(&AUDIO.System.lock);
+    }
+
     UnloadAudioBuffer(sound.stream.buffer);
 
     TRACELOG(LOG_INFO, "WAVE: Unloaded sound data from RAM");
@@ -959,15 +983,16 @@ void PlaySoundMulti(Sound sound)
         StopAudioBuffer(AUDIO.MultiChannel.pool[index]);
     }
 
-    // Experimentally mutex lock doesn't seem to be needed this makes sense
-    // as pool[index] isn't playing and the only stuff we're copying
-    // shouldn't be changing...
+    // DUNK: Locked after all: if every channel was busy, the one being reused may be mid-mix, and swapping its data and size under the
+    // mixer can make it read past the end of the new sound
+    ma_mutex_lock(&AUDIO.System.lock);
 
     AUDIO.MultiChannel.channels[index] = AUDIO.MultiChannel.poolCounter;
     AUDIO.MultiChannel.poolCounter++;
 
     AUDIO.MultiChannel.pool[index]->volume = sound.stream.buffer->volume;
     AUDIO.MultiChannel.pool[index]->pitch = sound.stream.buffer->pitch;
+    AUDIO.MultiChannel.pool[index]->pan = sound.stream.buffer->pan;
     AUDIO.MultiChannel.pool[index]->looping = sound.stream.buffer->looping;
     AUDIO.MultiChannel.pool[index]->usage = sound.stream.buffer->usage;
     AUDIO.MultiChannel.pool[index]->isSubBufferProcessed[0] = false;
@@ -976,6 +1001,8 @@ void PlaySoundMulti(Sound sound)
     AUDIO.MultiChannel.pool[index]->data = sound.stream.buffer->data;
 
     PlayAudioBuffer(AUDIO.MultiChannel.pool[index]);
+
+    ma_mutex_unlock(&AUDIO.System.lock);
 }
 
 // Stop any sound played with PlaySoundMulti()
@@ -1025,6 +1052,12 @@ bool IsSoundPlaying(Sound sound)
 void SetSoundVolume(Sound sound, float volume)
 {
     SetAudioBufferVolume(sound.stream.buffer, volume);
+}
+
+// Set pan for a sound (0 left, 0.5 centre, 1 right).  (CarouselEngine addition: raylib 4 has the same function)
+void SetSoundPan(Sound sound, float pan)
+{
+    if (sound.stream.buffer != NULL) sound.stream.buffer->pan = pan;
 }
 
 // Set pitch for a sound
@@ -2112,7 +2145,7 @@ static void OnSendAudioDataToDevice(ma_device *pDevice, void *pFramesOut, const 
                         float *framesOut = (float *)pFramesOut + (framesRead*AUDIO.System.device.playback.channels);
                         float *framesIn  = tempBuffer;
 
-                        MixAudioFrames(framesOut, framesIn, framesJustRead, audioBuffer->volume);
+                        MixAudioFrames(framesOut, framesIn, framesJustRead, audioBuffer->volume, audioBuffer->pan);
 
                         framesToRead -= framesJustRead;
                         framesRead += framesJustRead;
@@ -2154,8 +2187,18 @@ static void OnSendAudioDataToDevice(ma_device *pDevice, void *pFramesOut, const 
 
 // This is the main mixing function. Mixing is pretty simple in this project - it's just an accumulation.
 // NOTE: framesOut is both an input and an output. It will be initially filled with zeros outside of this function.
-static void MixAudioFrames(float *framesOut, const float *framesIn, ma_uint32 frameCount, float localVolume)
+static void MixAudioFrames(float *framesOut, const float *framesIn, ma_uint32 frameCount, float localVolume, float pan)
 {
+    // Panning (stereo only): full volume in the middle, the far side fading out as it moves to one side
+    float gains[2] = { 1.0f, 1.0f };
+    if (AUDIO.System.device.playback.channels == 2)
+    {
+        if (pan < 0.0f) pan = 0.0f;
+        if (pan > 1.0f) pan = 1.0f;
+        gains[0] = (pan > 0.5f)? 2.0f*(1.0f - pan) : 1.0f;
+        gains[1] = (pan < 0.5f)? 2.0f*pan : 1.0f;
+    }
+
     for (ma_uint32 iFrame = 0; iFrame < frameCount; ++iFrame)
     {
         for (ma_uint32 iChannel = 0; iChannel < AUDIO.System.device.playback.channels; ++iChannel)
@@ -2163,7 +2206,7 @@ static void MixAudioFrames(float *framesOut, const float *framesIn, ma_uint32 fr
             float *frameOut = framesOut + (iFrame*AUDIO.System.device.playback.channels);
             const float *frameIn  = framesIn  + (iFrame*AUDIO.System.device.playback.channels);
 
-            frameOut[iChannel] += (frameIn[iChannel]*localVolume);
+            frameOut[iChannel] += (frameIn[iChannel]*localVolume*((iChannel < 2)? gains[iChannel] : 1.0f));
         }
     }
 }
