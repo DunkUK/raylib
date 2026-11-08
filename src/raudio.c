@@ -1060,6 +1060,12 @@ void SetSoundPan(Sound sound, float pan)
     if (sound.stream.buffer != NULL) sound.stream.buffer->pan = pan;
 }
 
+// Set whether a sound loops when played with PlaySound() (CarouselEngine addition: raylib 3.7 only loops music)
+void SetSoundLooping(Sound sound, bool looping)
+{
+    if (sound.stream.buffer != NULL) sound.stream.buffer->looping = looping;
+}
+
 // Set pitch for a sound
 void SetSoundPitch(Sound sound, float pitch)
 {
