@@ -3378,8 +3378,13 @@ Vector2 GetMousePosition(void)
 {
     Vector2 position = { 0 };
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_ANDROID)
     position = GetTouchPosition(0);
+#elif defined(PLATFORM_WEB)
+    // (Carousel: SetMouseOffset/SetMouseScale apply on web too, as for GetMouseX/Y, so UI scaling works there)
+    position = GetTouchPosition(0);
+    position.x = (position.x + CORE.Input.Mouse.offset.x)*CORE.Input.Mouse.scale.x;
+    position.y = (position.y + CORE.Input.Mouse.offset.y)*CORE.Input.Mouse.scale.y;
 #else
     position.x = (CORE.Input.Mouse.position.x + CORE.Input.Mouse.offset.x)*CORE.Input.Mouse.scale.x;
     position.y = (CORE.Input.Mouse.position.y + CORE.Input.Mouse.offset.y)*CORE.Input.Mouse.scale.y;
