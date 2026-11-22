@@ -4391,6 +4391,10 @@ static bool InitGraphicsDevice(int width, int height)
     CORE.Window.currentFbo.width = CORE.Window.screen.width;
     CORE.Window.currentFbo.height = CORE.Window.screen.height;
 
+#if defined(PLATFORM_WEB)
+    WindowSizeCallback(CORE.Window.handle, CORE.Window.screen.width, CORE.Window.screen.height);   // (Carousel: the canvas at the screen's real resolution from the start)
+#endif
+
     ClearBackground(RAYWHITE);      // Default background color for raylib games :P
 
 #if defined(PLATFORM_ANDROID) || defined(PLATFORM_UWP)
@@ -4583,8 +4587,71 @@ static void Wait(float ms)
 }
 
 // Poll (store) all input events
+#if defined(PLATFORM_WEB)
+// (Carousel) High DPI canvas on web.  Emscripten and GLFW size the canvas in CSS pixels (the window size: 900x800, or the
+// screen's size in CSS pixels when fullscreen), so on a scaled display (Windows at 150%, a Mac's retina screen, browser zoom)
+// the browser stretched it up to the real pixels, and everything was soft or unevenly chunky.  Instead the canvas's backing
+// store is made its CSS size x devicePixelRatio, with its CSS size pinned, so it's shown 1:1 on the screen's real pixels, and
+// raylib's screen size (GetScreenWidth etc.) is that real size.  Mouse positions need nothing: emscripten already scales them
+// to the backing store (x * canvas.width / its displayed width).  GLFW's own idea of the window size stays in CSS pixels, so
+// emscripten's fullscreen and back keep working
+static bool webHighDpi = true;
+static float webPixelRatio = 1.0f;          // What the canvas was last sized for
+static int webCssWidth = 0;                 // Its size in CSS pixels (GLFW's window size)
+static int webCssHeight = 0;
+static int webCanvasWidth = 0;              // Its backing store's size
+static int webCanvasHeight = 0;
+
+static float WebWantedPixelRatio(void)
+{
+    if (!webHighDpi) return 1.0f;
+    float ratio = (float)emscripten_get_device_pixel_ratio();
+    return (ratio < 1.0f)? 1.0f : ((ratio > 4.0f)? 4.0f : ratio);   // (Never fewer pixels than before; and not silly amounts)
+}
+
+// Sizes the canvas for a CSS size, returning the backing store's size
+static void WebApplyPixelRatio(int cssWidth, int cssHeight, int *width, int *height)
+{
+    webCssWidth = cssWidth;
+    webCssHeight = cssHeight;
+    webPixelRatio = WebWantedPixelRatio();
+    webCanvasWidth = (int)((float)cssWidth*webPixelRatio + 0.5f);
+    webCanvasHeight = (int)((float)cssHeight*webPixelRatio + 0.5f);
+    emscripten_set_canvas_element_size("#canvas", webCanvasWidth, webCanvasHeight);
+    emscripten_set_element_css_size("#canvas", (double)cssWidth, (double)cssHeight);
+    *width = webCanvasWidth;
+    *height = webCanvasHeight;
+}
+
+// Once a frame: the ratio can change without a resize (browser zoom, or the window dragged to another screen), and anything
+// resetting the canvas behind our back gets put right
+static void WebCheckPixelRatio(void)
+{
+    if (webCssWidth <= 0 || webCssHeight <= 0 || CORE.Window.handle == NULL) return;
+    int width = 0, height = 0;
+    emscripten_get_canvas_element_size("#canvas", &width, &height);
+    if ((WebWantedPixelRatio() != webPixelRatio) || (width != webCanvasWidth) || (height != webCanvasHeight))
+    {
+        WindowSizeCallback(CORE.Window.handle, webCssWidth, webCssHeight);
+    }
+}
+#endif
+
+// (Carousel) Web: whether the canvas is drawn at the screen's real resolution (see WebApplyPixelRatio).  Does nothing elsewhere
+void SetWebCanvasHighDPI(bool enabled)
+{
+#if defined(PLATFORM_WEB)
+    if (webHighDpi == enabled) return;
+    webHighDpi = enabled;
+    if (webCssWidth > 0 && webCssHeight > 0 && CORE.Window.handle != NULL) WindowSizeCallback(CORE.Window.handle, webCssWidth, webCssHeight);
+#endif
+}
+
 static void PollInputEvents(void)
 {
+#if defined(PLATFORM_WEB)
+    WebCheckPixelRatio();
+#endif
 #if defined(SUPPORT_GESTURES_SYSTEM)
     // NOTE: Gestures update must be called every frame to reset gestures correctly
     // because ProcessGestureEvent() is just called on an event, not every frame
@@ -4929,6 +4996,9 @@ static void ErrorCallback(int error, const char *description)
 // NOTE: Window resizing not allowed by default
 static void WindowSizeCallback(GLFWwindow *window, int width, int height)
 {
+#if defined(PLATFORM_WEB)
+    WebApplyPixelRatio(width, height, &width, &height);   // (Carousel: width and height are CSS pixels: the canvas is sized up to the real ones)
+#endif
     SetupViewport(width, height);    // Reset viewport and projection matrix for new size
     CORE.Window.currentFbo.width = width;
     CORE.Window.currentFbo.height = height;
